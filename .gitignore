@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.pytest_cache/
+
+# Databases & local state
+*.db
+*.sqlite
+*.sqlite3
+backend/nexora_fx.db
+
+# Environment & Secrets
+.env
+.env.local
+*.log
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+Thumbs.db
