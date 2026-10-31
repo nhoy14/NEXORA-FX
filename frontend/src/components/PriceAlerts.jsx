@@ -9,18 +9,34 @@ import { soundEngine } from '../services/soundEngine.js';
 
 export default function PriceAlerts({ symbol, currentPrice }) {
   const [alerts, setAlerts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('nexora_alerts') || '[]'); }
-    catch { return []; }
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return JSON.parse(localStorage.getItem('nexora_alerts') || '[]');
+      }
+    } catch {
+      return [];
+    }
+    return [];
   });
   const [newPrice, setNewPrice] = useState('');
   const [newDir, setNewDir] = useState('above');
-  const [notifPermission, setNotifPermission] = useState(Notification?.permission ?? 'default');
+  const [notifPermission, setNotifPermission] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && 'Notification' in window) ? Notification.permission : 'default';
+    } catch {
+      return 'default';
+    }
+  });
   const [open, setOpen] = useState(false);
   const triggeredRef = useRef(new Set());
 
   // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem('nexora_alerts', JSON.stringify(alerts));
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('nexora_alerts', JSON.stringify(alerts));
+      }
+    } catch (e) {}
   }, [alerts]);
 
   // Check alerts on price update

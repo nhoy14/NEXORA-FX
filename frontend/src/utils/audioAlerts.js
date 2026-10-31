@@ -1,34 +1,59 @@
 /**
  * NEXORA FX — Audio Alerts & AI Voice Synthesizer
  * Uses Web Audio API for synthetic chimes and Web Speech API for voice announcements.
+ * 100% resilient for iOS Safari, WebKit, and mobile in-app browsers.
  */
 
 let audioCtx = null;
 
-function getAudioContext() {
-  if (typeof window === 'undefined') return null;
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
+const safeStorage = {
+  getItem: (key) => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      // SecurityError on iOS private/in-app WebKit
+    }
+    return null;
+  },
+  setItem: (key, val) => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, val);
+      }
+    } catch (e) {
+      // Ignore storage restrictions
     }
   }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+};
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  } catch (e) {
+    return null;
   }
   return audioCtx;
 }
 
 export const audioAlerts = {
   isEnabled: () => {
-    if (typeof window === 'undefined') return false;
-    const saved = localStorage.getItem('nexora_sound_alerts');
+    const saved = safeStorage.getItem('nexora_sound_alerts');
     return saved === null ? true : saved === 'true';
   },
 
   setEnabled: (val) => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('nexora_sound_alerts', val ? 'true' : 'false');
+    safeStorage.setItem('nexora_sound_alerts', val ? 'true' : 'false');
     if (val) {
       audioAlerts.playPing();
     }
@@ -50,8 +75,8 @@ export const audioAlerts = {
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
-      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15); // E6
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
 
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
@@ -73,7 +98,7 @@ export const audioAlerts = {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      const notes = [523.25, 659.25, 783.99, 1046.50];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -103,7 +128,7 @@ export const audioAlerts = {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      const notes = [880, 698.46, 587.33, 440]; // A5, F5, D5, A4
+      const notes = [880, 698.46, 587.33, 440];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -160,15 +185,17 @@ export const audioAlerts = {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
     try {
-      window.speechSynthesis.cancel(); // Stop prior queue
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
       utterance.volume = 0.85;
 
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')));
-      if (preferredVoice) utterance.voice = preferredVoice;
+      const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+      if (voices && voices.length > 0) {
+        const preferredVoice = voices.find(v => v.lang && v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')));
+        if (preferredVoice) utterance.voice = preferredVoice;
+      }
 
       window.speechSynthesis.speak(utterance);
     } catch (e) {
@@ -183,4 +210,3 @@ export const audioAlerts = {
     audioAlerts.speak(text);
   }
 };
-
